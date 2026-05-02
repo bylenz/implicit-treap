@@ -1,145 +1,144 @@
-# Implicit Treap — EDA, Proyecto 3
+# Implicit Treap — EDA, Project 3
 
-BST implícito basado en treap aleatorizado con propagación lazy. Soporta
-operaciones de rango (suma, reversión, rotación, mínimo) e inserción/eliminación
-por posición. Todas las operaciones corren en **O(log n) esperado**.
+Implicit BST based on a randomized treap with lazy propagation. Supports
+range operations (add, reverse, rotate, minimum) and insertion/deletion by
+position. All operations run in **O(log n) expected**.
 
 ---
 
-## Conceptos clave
+## Key concepts
 
-### ¿Qué es un Treap?
+### What is a Treap?
 
-Un treap es un árbol binario de búsqueda (BST) que a cada nodo le asigna una
-**prioridad aleatoria** y mantiene la propiedad de heap respecto a ella. La
-aleatoriedad garantiza que el árbol quede balanceado con alta probabilidad,
-dando O(log n) en todas las operaciones.
+A treap is a binary search tree (BST) where each node is assigned a **random
+priority** and the tree maintains the heap property with respect to it. The
+randomness guarantees the tree stays balanced with high probability, giving
+O(log n) on all operations.
 
-### ¿Qué es "implícito"?
+### What does "implicit" mean?
 
-En un BST normal la clave de cada nodo es el valor almacenado. En un treap
-implícito la **clave es la posición en el arreglo** — y no se guarda
-explícitamente. Se deduce en tiempo real contando los nodos del subárbol
-izquierdo (`size`). Esto permite usar el árbol como un **arreglo dinámico**
-donde cualquier subrango se puede aislar, transformar y reensamblar en O(log n).
+In a regular BST the key of each node is its stored value. In an implicit treap
+the **key is the position in the sequence** — and it is never stored explicitly.
+It is derived on the fly by counting nodes in the left subtree (`size`). This
+lets us use the tree as a **dynamic array** where any subrange can be isolated,
+transformed, and reassembled in O(log n).
 
-### Operaciones primitivas: split y merge
+### Primitive operations: split and merge
 
-Todo lo demás se construye sobre dos operaciones:
+Everything else is built on top of two operations:
 
-- **`split(root, k)`** — divide el árbol en dos: los primeros `k` elementos y
-  el resto. O(log n).
-- **`merge(left, right)`** — une dos treaps manteniendo la propiedad de heap.
-  O(log n).
+- **`split(root, k)`** — splits the tree into two: the first `k` elements and
+  the rest. O(log n).
+- **`merge(left, right)`** — joins two treaps while maintaining the heap
+  property. O(log n).
 
-Una operación de rango `[l, r]` siempre sigue el mismo patrón:
+Every range operation `[l, r]` follows the same pattern:
 
 ```
-split en l-1  →  split en (r-l+1)  →  operar sobre el segmento medio  →  merge
+split at l-1  →  split at (r-l+1)  →  operate on the middle segment  →  merge
 ```
 
 ### Lazy propagation
 
-En lugar de bajar a cada nodo del rango, se guarda la operación pendiente en
-la raíz del segmento y se propaga (`push_down`) solo cuando se necesita
-descender. Dos lazies coexisten en cada nodo:
+Instead of visiting every node in the range, the pending operation is stored at
+the root of the segment and pushed down (`push_down`) only when a descent is
+needed. Two lazy fields coexist in each node:
 
-| Campo        | Propósito                                      |
-|--------------|------------------------------------------------|
-| `lazy_add`   | Suma acumulada pendiente de propagar a hijos   |
-| `lazy_rev`   | Indica si el subárbol está pendiente de invertir |
+| Field       | Purpose                                              |
+|-------------|------------------------------------------------------|
+| `lazy_add`  | Accumulated sum pending propagation to children      |
+| `lazy_rev`  | Whether the subtree is pending a reversal            |
 
-### Pool de nodos (arena allocator)
+### Node pool (arena allocator)
 
-Los nodos no se alojan en el heap con `new`. Todos viven en un `std::vector<Node>`
-llamado `pool`. Los punteros son **índices enteros** (`int`), no punteros reales.
-Ventajas: cache-friendly, sin fragmentación, sin overhead de `malloc`.
+Nodes are not heap-allocated with `new`. They all live in a `std::vector<Node>`
+called `pool`. "Pointers" are plain **integer indices** (`int`), not real
+pointers. Benefits: cache-friendly, no fragmentation, no `malloc` overhead.
 
 ---
 
-## Operaciones soportadas
+## Supported operations
 
-| Código | Firma                          | Descripción                                      |
-|--------|--------------------------------|--------------------------------------------------|
-| `A`    | `A l r delta`                  | Suma `delta` a todos los elementos en `[l, r]`   |
-| `R`    | `R l r`                        | Revierte el subarreglo `[l, r]`                  |
-| `O`    | `O l r k`                      | Rota `k` posiciones a la derecha el rango `[l, r]`|
-| `I`    | `I pos val`                    | Inserta `val` en la posición `pos` (1-indexed)   |
-| `E`    | `E pos`                        | Elimina el elemento en la posición `pos`         |
-| `M`    | `M l r`  → imprime el mínimo   | Mínimo del subarreglo `[l, r]`                   |
+| Code | Signature                    | Description                                       |
+|------|------------------------------|---------------------------------------------------|
+| `A`  | `A l r delta`                | Add `delta` to every element in `[l, r]`          |
+| `R`  | `R l r`                      | Reverse the subarray `[l, r]`                     |
+| `O`  | `O l r k`                    | Right-rotate the range `[l, r]` by `k` positions  |
+| `I`  | `I pos val`                  | Insert `val` at position `pos` (1-indexed)        |
+| `E`  | `E pos`                      | Delete the element at position `pos`              |
+| `M`  | `M l r`  → prints minimum    | Minimum of the subarray `[l, r]`                  |
 
 ---
 
 ## Build
 
-### 1. Configurar
+### 1. Configure
 
 ```bash
 cmake -B build                                    # release (O2, NDEBUG)
 cmake -B build-debug -DCMAKE_BUILD_TYPE=Debug     # debug (ASan + UBSan)
 ```
 
-### 2. Dar permisos a los scripts (solo la primera vez)
+### 2. Grant execute permissions to the scripts (first time only)
 
 ```bash
 chmod +x tests/stress.sh tests/bench.sh
 ```
 
-### 3. Compilar y usar
+### 3. Compile and run
 
-Todos los targets se invocan con `make -C <directorio>`:
+All targets are invoked with `make -C <directory>`:
 
-| Comando                      | Qué hace                                                    |
+| Command                      | What it does                                                |
 |------------------------------|-------------------------------------------------------------|
-| `make -C build`              | Compila el ejecutable `build/main` en modo release          |
-| `make -C build-debug`        | Compila con AddressSanitizer y UndefinedBehaviorSanitizer   |
-| `make -C build run`          | Compila y ejecuta con `tests/sample.in`                     |
-| `make -C build test_sample`  | Compila, ejecuta y compara salida contra `tests/sample.out` |
-| `make -C build stress`       | Stress test: 200 casos aleatorios contra solución bruta     |
-| `make -C build bench`        | Benchmark con n=q=500 000                                   |
+| `make -C build`              | Compiles `build/main` in release mode                       |
+| `make -C build-debug`        | Compiles with AddressSanitizer and UndefinedBehaviorSanitizer |
+| `make -C build run`          | Compiles and runs with `tests/sample.in`                    |
+| `make -C build test_sample`  | Compiles, runs, and diffs output against `tests/sample.out` |
+| `make -C build stress`       | Stress test: 200 random cases against the brute-force       |
+| `make -C build bench`        | Benchmark with n=q=500 000                                  |
 
-Para cambiar el número de iteraciones del stress test:
+To change the number of stress-test iterations:
 
 ```bash
-# Editar directamente el target o pasarlo al script manualmente
 ./tests/stress.sh 500
 ```
 
 ---
 
-## Formato de entrada
+## Input format
 
 ```
 N Q
 a1 a2 ... aN
-<operación 1>
-<operación 2>
+<operation 1>
+<operation 2>
 ...
 ```
 
-- `N`: cantidad inicial de elementos  
-- `Q`: cantidad de operaciones  
-- Índices **1-based**
+- `N`: initial number of elements
+- `Q`: number of operations
+- Indices are **1-based**
 
 ---
 
-## Estructura del proyecto
+## Project structure
 
 ```
 .
 ├── include/
-│   └── treap.hpp        interfaz pública (Node, namespace treap)
+│   └── treap.hpp        public interface (Node, namespace treap)
 ├── src/
-│   ├── treap.cpp        split, merge, lazy, operaciones de rango
-│   └── main.cpp         I/O, parsing, dispatcher
+│   ├── treap.cpp        split, merge, lazy propagation, range operations
+│   └── main.cpp         I/O, parsing, operation dispatcher
 ├── tests/
-│   ├── brute.cpp        solución O(n) por operación para validar
-│   ├── gen.cpp          generador de casos pequeños aleatorios
-│   ├── gen_big.cpp      generador de casos grandes (benchmark)
-│   ├── stress.sh        compara main vs brute en N seeds
-│   ├── bench.sh         mide tiempo con entrada de 500k operaciones
-│   └── sample.in / .out caso de ejemplo del enunciado
+│   ├── brute.cpp        O(n)-per-op brute-force for correctness validation
+│   ├── gen.cpp          random small-case generator
+│   ├── gen_big.cpp      large-case generator (benchmark)
+│   ├── stress.sh        runs main vs brute on N random seeds
+│   ├── bench.sh         times main on a 500k-operation input
+│   └── sample.in / .out example case from the problem statement
 ├── report/
-│   └── report.tex       reporte de implementación
+│   └── report.tex       implementation report
 └── CMakeLists.txt
 ```
