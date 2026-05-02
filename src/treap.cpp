@@ -170,9 +170,9 @@ auto op_minimum(int root, int left_index, int right_index) -> std::pair<int, lon
     auto [T1, T2] = split(root, left_index - 1);
     auto [M, T3] = split(T2, right_index - left_index + 1);
 
-    long long minimun = pool[M].min_val;
+    long long minimum = pool[M].min_val;
 
-    return {merge(T1, merge(M, T3)), minimun};
+    return {merge(T1, merge(M, T3)), minimum};
 }
 
 }  // namespace treap
